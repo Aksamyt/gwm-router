@@ -21,7 +21,12 @@ const (
 	itemError itemType = iota
 
 	itemSep
+	itemLacc
+	itemRacc
+	itemDot
+	itemComma
 	itemRaw
+	itemVar
 
 	itemEOF
 )
@@ -37,8 +42,18 @@ func (i item) String() string {
 		return fmt.Sprintf("ERORR %s", i.val)
 	case itemSep:
 		return "/"
+	case itemLacc:
+		return "{"
+	case itemRacc:
+		return "}"
+	case itemDot:
+		return "."
+	case itemComma:
+		return ","
 	case itemRaw:
 		return fmt.Sprintf("%q", i.val)
+	case itemVar:
+		return fmt.Sprintf("'%s'", i.val)
 	case itemEOF:
 		return "EOF"
 	}
@@ -99,6 +114,14 @@ func (l *lexer) run() {
 	close(l.items)
 }
 
+func isVarchar(c byte) bool {
+	return false ||
+		c >= 'a' && c <= 'z' ||
+		c >= 'A' && c <= 'Z' ||
+		c >= '0' && c <= '9' ||
+		c == '_'
+}
+
 type stateFn func(*lexer) stateFn
 
 // lexPath is the entrypoint
@@ -114,6 +137,9 @@ func lexPath(l *lexer) stateFn {
 		return lexPath
 	case '%':
 		return lexPercent
+	case '{':
+		l.emit(itemLacc)
+		return lexBeginExpr
 	default:
 		l.pos--
 		return lexRaw
@@ -158,4 +184,57 @@ func lexPercent(l *lexer) stateFn {
 	}
 	l.emitRaw(string(decoded))
 	return lexPath
+}
+
+// lexBeginExpr scans an identifier, or an operator if present.
+//
+// - l.pos is after the `{` delimiter
+func lexBeginExpr(l *lexer) stateFn {
+	c, eof := l.next()
+	switch {
+	case eof:
+		return l.error(errorUnfinishedExpr())
+	case c == '}':
+		return l.error(errorEmptyExpr())
+	case isVarchar(c):
+		return lexVar
+	default:
+		return l.error(errorUnexpected(c))
+	}
+}
+
+// lexInExpr scans elements inside an expression until the `}` delimiter.
+//
+// - l.pos is after the `{` delimiter, or after another expression item
+func lexInExpr(l *lexer) stateFn {
+	for {
+		c, eof := l.next()
+		switch {
+		case eof:
+			return l.error(errorUnfinishedExpr())
+		case c == '}':
+			l.emit(itemRacc)
+			return lexPath
+		case c == '.':
+			l.emit(itemDot)
+		case c == ',':
+			l.emit(itemComma)
+		case isVarchar(c):
+			return lexVar
+		default:
+			return l.error(errorUnexpected(c))
+		}
+	}
+}
+
+// lexVar scans a variable identifier.
+//
+// - l.pos is after the first character of the variable
+func lexVar(l *lexer) stateFn {
+	// l.peek() return (0, false) at l.eof()
+	for c, _ := l.peek(); isVarchar(c); c, _ = l.peek() {
+		l.pos++
+	}
+	l.emit(itemVar)
+	return lexInExpr
 }

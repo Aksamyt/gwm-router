@@ -27,3 +27,15 @@ func errorUnfinishedPercent() string {
 func errorIllegalPercent(r rune) string {
 	return fmt.Sprintf("%s, got %#U", errorUnfinishedPercent(), r)
 }
+
+func errorUnfinishedExpr() string {
+	return "expected '}', got EOF"
+}
+
+func errorEmptyExpr() string {
+	return "empty expression"
+}
+
+func errorUnexpected(c byte) string {
+	return fmt.Sprintf("unexpected %#U", c)
+}

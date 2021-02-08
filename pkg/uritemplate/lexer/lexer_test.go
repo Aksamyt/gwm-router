@@ -48,8 +48,13 @@ func sayError(t *testing.T, tt lexTest, items []item) {
 
 var (
 	tSep   = item{itemSep, "/"}
+	tLacc  = item{itemLacc, "{"}
+	tRacc  = item{itemRacc, "}"}
+	tDot   = item{itemDot, "."}
+	tComma = item{itemComma, ","}
 	tEOF   = item{itemEOF, ""}
 	tRaw   = func(v string) item { return item{itemRaw, v} }
+	tVar   = func(v string) item { return item{itemVar, v} }
 	tError = func(msg string) item { return item{itemError, msg} }
 )
 
@@ -62,7 +67,12 @@ func TestStringer(t *testing.T) {
 			[]item{tError(errorUnfinishedPercent())},
 		},
 		{"itemSep", "[/]", []item{tSep}},
+		{"itemLacc", "[{]", []item{tLacc}},
+		{"itemRacc", "[}]", []item{tRacc}},
+		{"itemDot", "[.]", []item{tDot}},
+		{"itemComma", "[,]", []item{tComma}},
 		{`itemRaw("hello")`, `["hello"]`, []item{tRaw("hello")}},
+		{`itemVar("hello")`, `['hello']`, []item{tVar("hello")}},
 		{"itemEOF", "[EOF]", []item{tEOF}},
 	} {
 		out := fmt.Sprintf("%+v", tt.items)
@@ -193,5 +203,74 @@ func TestRandomSlashes(t *testing.T) {
 		input := e.In[1].(string)
 		items := collect(lex(input))
 		sayError(t, lexTest{"random slash", input, expected}, items)
+	}
+}
+
+func TestVariableList(t *testing.T) {
+	for _, tt := range []lexTest{
+		{"single var", "{oui}", []item{
+			tLacc,
+			tVar("oui"),
+			tRacc,
+			tEOF,
+		}},
+		{"var with dots", "{foo.bar}", []item{
+			tLacc,
+			tVar("foo"),
+			tDot,
+			tVar("bar"),
+			tRacc,
+			tEOF,
+		}},
+		{"vars with commas", "{foo,bar}", []item{
+			tLacc,
+			tVar("foo"),
+			tComma,
+			tVar("bar"),
+			tRacc,
+			tEOF,
+		}},
+		{"lots of things", "{a,,b.c_d,.12,}", []item{
+			tLacc,
+			tVar("a"),
+			tComma,
+			tComma,
+			tVar("b"),
+			tDot,
+			tVar("c_d"),
+			tComma,
+			tDot,
+			tVar("12"),
+			tComma,
+			tRacc,
+			tEOF,
+		}},
+	} {
+		items := collect(lex(tt.input))
+		if !equal(items, tt.items) {
+			sayError(t, tt, items)
+		}
+	}
+}
+
+func TestWrongExpr(t *testing.T) {
+	for _, tt := range []lexTest{
+		{"nothing", "{}", []item{tLacc, tError(errorEmptyExpr())}},
+		{"unfinished", "{", []item{
+			tLacc,
+			tError(errorUnfinishedExpr()),
+		}},
+		{"unfinished 2", "{hello", []item{
+			tLacc,
+			tVar("hello"),
+			tError(errorUnfinishedExpr()),
+		}},
+		{"illegal operator", "{+}", []item{tLacc, tError(errorUnexpected('+'))}},
+		{"illegal operator 2", "{a+}", []item{tLacc, tVar("a"), tError(errorUnexpected('+'))}},
+	} {
+		items := collect(lex(tt.input))
+		if !equal(items, tt.items) {
+			sayError(t, tt, items)
+		}
 	}
 }
