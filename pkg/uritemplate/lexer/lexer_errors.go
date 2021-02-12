@@ -43,3 +43,7 @@ func errorUnexpected(c byte) string {
 func errorReservedOp(c byte) string {
 	return fmt.Sprintf("unexpected reserved operator %#U", c)
 }
+
+func errorExpectedLength() string {
+	return "expected length"
+}

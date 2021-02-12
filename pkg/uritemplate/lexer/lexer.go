@@ -24,6 +24,9 @@ const (
 	itemLacc
 	itemRacc
 	itemOp
+	itemExplode
+	itemPrefix
+	itemLength
 	itemDot
 	itemComma
 	itemRaw
@@ -48,6 +51,12 @@ func (i item) String() string {
 	case itemRacc:
 		return "}"
 	case itemOp:
+		return i.val
+	case itemExplode:
+		return "*"
+	case itemPrefix:
+		return ":"
+	case itemLength:
 		return i.val
 	case itemDot:
 		return "."
@@ -234,8 +243,29 @@ func lexInExpr(l *lexer) stateFn {
 				l.pos++
 			}
 			l.emit(itemVar)
+		case c == '*':
+			l.emit(itemExplode)
+		case c == ':':
+			l.emit(itemPrefix)
+			return lexLength
 		default:
 			return l.error(errorUnexpected(c))
 		}
+	}
+}
+
+// lexLength scans at most and 4 ascii digits.
+func lexLength(l *lexer) stateFn {
+	for {
+		// l.peek() return (0, false) at l.eof()
+		c, _ := l.peek()
+		if c < '0' || c > '9' || l.pos > l.start+3 {
+			if l.pos == l.start {
+				return l.error(errorExpectedLength())
+			}
+			l.emit(itemLength)
+			return lexInExpr
+		}
+		l.pos++
 	}
 }
