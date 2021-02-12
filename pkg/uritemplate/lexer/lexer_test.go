@@ -47,15 +47,16 @@ func sayError(t *testing.T, tt lexTest, items []item) {
 }
 
 var (
+	tError = func(msg string) item { return item{itemError, msg} }
 	tSep   = item{itemSep, "/"}
 	tLacc  = item{itemLacc, "{"}
 	tRacc  = item{itemRacc, "}"}
+	tOp    = func(op string) item { return item{itemOp, op} }
 	tDot   = item{itemDot, "."}
 	tComma = item{itemComma, ","}
 	tEOF   = item{itemEOF, ""}
 	tRaw   = func(v string) item { return item{itemRaw, v} }
 	tVar   = func(v string) item { return item{itemVar, v} }
-	tError = func(msg string) item { return item{itemError, msg} }
 )
 
 func TestStringer(t *testing.T) {
@@ -63,12 +64,13 @@ func TestStringer(t *testing.T) {
 		{"invalid", "[]", []item{{typ: -1, val: ""}}},
 		{
 			"itemError",
-			fmt.Sprintf("[ERORR %s]", errorUnfinishedPercent()),
+			fmt.Sprintf("[ERROR %s]", errorUnfinishedPercent()),
 			[]item{tError(errorUnfinishedPercent())},
 		},
 		{"itemSep", "[/]", []item{tSep}},
 		{"itemLacc", "[{]", []item{tLacc}},
 		{"itemRacc", "[}]", []item{tRacc}},
+		{"itemOp", "[+]", []item{tOp("+")}},
 		{"itemDot", "[.]", []item{tDot}},
 		{"itemComma", "[,]", []item{tComma}},
 		{`itemRaw("hello")`, `["hello"]`, []item{tRaw("hello")}},
@@ -253,8 +255,31 @@ func TestVariableList(t *testing.T) {
 	}
 }
 
+func TestPrefixOperators(t *testing.T) {
+	var tests []lexTest
+	for _, c := range "+#./;?&" {
+		tests = append(tests, lexTest{
+			fmt.Sprintf("op %c", c),
+			fmt.Sprintf("{%c}", c),
+			[]item{
+				tLacc,
+				tOp(string(c)),
+				tRacc,
+				tEOF,
+			},
+		})
+	}
+
+	for _, tt := range tests {
+		items := collect(lex(tt.input))
+		if !equal(items, tt.items) {
+			sayError(t, tt, items)
+		}
+	}
+}
+
 func TestWrongExpr(t *testing.T) {
-	for _, tt := range []lexTest{
+	tests := []lexTest{
 		{"nothing", "{}", []item{tLacc, tError(errorEmptyExpr())}},
 		{"unfinished", "{", []item{
 			tLacc,
@@ -265,9 +290,25 @@ func TestWrongExpr(t *testing.T) {
 			tVar("hello"),
 			tError(errorUnfinishedExpr()),
 		}},
-		{"illegal operator", "{+}", []item{tLacc, tError(errorUnexpected('+'))}},
-		{"illegal operator 2", "{a+}", []item{tLacc, tVar("a"), tError(errorUnexpected('+'))}},
-	} {
+		{"space", "{ ", []item{tLacc, tError(errorUnexpected(' '))}},
+		{"space 2", "{oi ", []item{
+			tLacc,
+			tVar("oi"),
+			tError(errorUnexpected(' ')),
+		}},
+	}
+	for _, c := range "=,!@|" {
+		tests = append(tests, lexTest{
+			fmt.Sprintf("reserved op %c", c),
+			fmt.Sprintf("{%c}", c),
+			[]item{
+				tLacc,
+				tError(errorReservedOp(byte(c))),
+			},
+		})
+	}
+
+	for _, tt := range tests {
 		items := collect(lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)

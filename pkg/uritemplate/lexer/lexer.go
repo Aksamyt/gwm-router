@@ -23,6 +23,7 @@ const (
 	itemSep
 	itemLacc
 	itemRacc
+	itemOp
 	itemDot
 	itemComma
 	itemRaw
@@ -39,13 +40,15 @@ type item struct {
 func (i item) String() string {
 	switch i.typ {
 	case itemError:
-		return fmt.Sprintf("ERORR %s", i.val)
+		return fmt.Sprintf("ERROR %s", i.val)
 	case itemSep:
 		return "/"
 	case itemLacc:
 		return "{"
 	case itemRacc:
 		return "}"
+	case itemOp:
+		return i.val
 	case itemDot:
 		return "."
 	case itemComma:
@@ -190,14 +193,20 @@ func lexPercent(l *lexer) stateFn {
 //
 // - l.pos is after the `{` delimiter
 func lexBeginExpr(l *lexer) stateFn {
-	c, eof := l.next()
+	c, eof := l.peek()
 	switch {
 	case eof:
 		return l.error(errorUnfinishedExpr())
 	case c == '}':
 		return l.error(errorEmptyExpr())
 	case isVarchar(c):
-		return lexVar
+		return lexInExpr
+	case strings.IndexByte("+#./;?&", c) != -1:
+		l.pos++
+		l.emit(itemOp)
+		return lexInExpr
+	case strings.IndexByte("=,!@|", c) != -1:
+		return l.error(errorReservedOp(c))
 	default:
 		return l.error(errorUnexpected(c))
 	}
@@ -220,21 +229,13 @@ func lexInExpr(l *lexer) stateFn {
 		case c == ',':
 			l.emit(itemComma)
 		case isVarchar(c):
-			return lexVar
+			// l.peek() return (0, false) at l.eof()
+			for c, _ := l.peek(); isVarchar(c); c, _ = l.peek() {
+				l.pos++
+			}
+			l.emit(itemVar)
 		default:
 			return l.error(errorUnexpected(c))
 		}
 	}
-}
-
-// lexVar scans a variable identifier.
-//
-// - l.pos is after the first character of the variable
-func lexVar(l *lexer) stateFn {
-	// l.peek() return (0, false) at l.eof()
-	for c, _ := l.peek(); isVarchar(c); c, _ = l.peek() {
-		l.pos++
-	}
-	l.emit(itemVar)
-	return lexInExpr
 }

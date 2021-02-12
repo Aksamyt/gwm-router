@@ -39,3 +39,7 @@ func errorEmptyExpr() string {
 func errorUnexpected(c byte) string {
 	return fmt.Sprintf("unexpected %#U", c)
 }
+
+func errorReservedOp(c byte) string {
+	return fmt.Sprintf("unexpected reserved operator %#U", c)
+}
