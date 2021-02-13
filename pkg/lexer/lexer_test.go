@@ -1,4 +1,4 @@
-package uritemplatelexer
+package lexer
 
 import (
 	"errors"
