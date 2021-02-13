@@ -7,6 +7,9 @@
   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+// Package lexer provides a scanner for URI templates.
+//
+// See https://tools.ietf.org/html/rfc6570 for the complete specification.
 package lexer
 
 import (
@@ -15,58 +18,62 @@ import (
 	"strings"
 )
 
-type itemType int
+// ItemType identifies the type of scanned items.
+type ItemType int
 
+// Item types
 const (
-	itemError itemType = iota
+	ItemError ItemType = iota // error occured, val is the explanation
 
-	itemSep
-	itemLacc
-	itemRacc
-	itemOp
-	itemExplode
-	itemPrefix
-	itemLength
-	itemDot
-	itemComma
-	itemRaw
-	itemVar
+	ItemSep     // path separator '/'
+	ItemLacc    // left expression delimiter '{'
+	ItemRacc    // right expression delimiter '}'
+	ItemOp      // expression operator (see [RFC6570] Section 2.2)
+	ItemExplode // explode variable modifier '*'
+	ItemPrefix  // prefix variable modifier ':'
+	ItemLength  // length of prefix, from 0 to 9999
+	ItemDot     // variable part separator '.'
+	ItemComma   // variable list separator ','
+	ItemRaw     // raw path component
+	ItemVar     // variable name
 
-	itemEOF
+	ItemEOF // got to the end of the input
 )
 
-type item struct {
-	typ itemType
-	val string
+// Item represents a lexeme.
+type Item struct {
+	Typ ItemType // type of the item
+	Val string   // scanned substring
 }
 
-func (i item) String() string {
-	switch i.typ {
-	case itemError:
-		return fmt.Sprintf("ERROR %s", i.val)
-	case itemSep:
+// String returns a human-readable representation of an item.
+func (i Item) String() string {
+	switch i.Typ {
+	case ItemError:
+		return fmt.Sprintf("ERROR %s", i.Val)
+	case ItemSep:
 		return "/"
-	case itemLacc:
+	case ItemLacc:
 		return "{"
-	case itemRacc:
+	case ItemRacc:
 		return "}"
-	case itemOp:
-		return i.val
-	case itemExplode:
+	case ItemOp:
+		return i.Val
+	case ItemExplode:
 		return "*"
-	case itemPrefix:
+	case ItemPrefix:
 		return ":"
-	case itemLength:
-		return i.val
-	case itemDot:
+	case ItemLength:
+		return i.Val
+	case ItemDot:
 		return "."
-	case itemComma:
+	case ItemComma:
 		return ","
-	case itemRaw:
-		return fmt.Sprintf("%q", i.val)
-	case itemVar:
-		return fmt.Sprintf("'%s'", i.val)
-	case itemEOF:
+	case ItemRaw:
+		return fmt.Sprintf("%q", i.Val)
+	case ItemVar:
+		return fmt.Sprintf("'%s'", i.Val)
+	case ItemEOF:
 		return "EOF"
 	}
 	return ""
@@ -76,18 +83,21 @@ type lexer struct {
 	input string
 	start int
 	pos   int
-	items chan item
+	items chan Item
 }
 
-func lex(input string) *lexer {
+// Lex scans an input string and returns a stream of items.
+// The last item that will be sent before closing the channel will always be
+// itemEOF or itemError.
+func Lex(input string) chan Item {
 	l := &lexer{
 		input: input,
 		start: 0,
 		pos:   0,
-		items: make(chan item),
+		items: make(chan Item),
 	}
 	go l.run()
-	return l
+	return l.items
 }
 
 func (l *lexer) eof() bool {
@@ -109,13 +119,13 @@ func (l *lexer) next() (byte, bool) {
 	return c, eof
 }
 
-func (l *lexer) emit(typ itemType) {
-	l.items <- item{typ, l.input[l.start:l.pos]}
+func (l *lexer) emit(typ ItemType) {
+	l.items <- Item{typ, l.input[l.start:l.pos]}
 	l.start = l.pos
 }
 
 func (l *lexer) emitRaw(s string) {
-	l.items <- item{itemRaw, s}
+	l.items <- Item{ItemRaw, s}
 	l.start = l.pos
 }
 
@@ -140,17 +150,17 @@ type stateFn func(*lexer) stateFn
 func lexPath(l *lexer) stateFn {
 	c, eof := l.next()
 	if eof {
-		l.emit(itemEOF)
+		l.emit(ItemEOF)
 		return nil
 	}
 	switch c {
 	case '/':
-		l.emit(itemSep)
+		l.emit(ItemSep)
 		return lexPath
 	case '%':
 		return lexPercent
 	case '{':
-		l.emit(itemLacc)
+		l.emit(ItemLacc)
 		return lexBeginExpr
 	default:
 		l.pos--
@@ -162,7 +172,7 @@ func lexPath(l *lexer) stateFn {
 //
 // - l.pos is at the beginning of the part
 //
-// - l.pos is at index 0 or after any of `}`, `/`, or percent-encoded
+// - l.pos is at index 0 or after any of '}', '/', or percent-encoded
 //
 // - undefined behaviour if l.eof()
 func lexRaw(l *lexer) stateFn {
@@ -176,13 +186,13 @@ func lexRaw(l *lexer) stateFn {
 			return l.error(errorIllegal(c))
 		}
 	}
-	l.emit(itemRaw)
+	l.emit(ItemRaw)
 	return lexPath
 }
 
 // lexPercent scans a percent-encoded character.
 //
-// - l.pos is after the `%` sign
+// - l.pos is after the '%' sign
 func lexPercent(l *lexer) stateFn {
 	l.pos += 2
 	if l.pos > len(l.input) {
@@ -200,7 +210,7 @@ func lexPercent(l *lexer) stateFn {
 
 // lexBeginExpr scans an identifier, or an operator if present.
 //
-// - l.pos is after the `{` delimiter
+// - l.pos is after the '{' delimiter
 func lexBeginExpr(l *lexer) stateFn {
 	c, eof := l.peek()
 	switch {
@@ -212,7 +222,7 @@ func lexBeginExpr(l *lexer) stateFn {
 		return lexInExpr
 	case strings.IndexByte("+#./;?&", c) != -1:
 		l.pos++
-		l.emit(itemOp)
+		l.emit(ItemOp)
 		return lexInExpr
 	case strings.IndexByte("=,!@|", c) != -1:
 		return l.error(errorReservedOp(c))
@@ -221,9 +231,9 @@ func lexBeginExpr(l *lexer) stateFn {
 	}
 }
 
-// lexInExpr scans elements inside an expression until the `}` delimiter.
+// lexInExpr scans elements inside an expression until the '}' delimiter.
 //
-// - l.pos is after the `{` delimiter, or after another expression item
+// - l.pos is after the '{' delimiter, or after another expression item
 func lexInExpr(l *lexer) stateFn {
 	for {
 		c, eof := l.next()
@@ -231,22 +241,22 @@ func lexInExpr(l *lexer) stateFn {
 		case eof:
 			return l.error(errorUnfinishedExpr())
 		case c == '}':
-			l.emit(itemRacc)
+			l.emit(ItemRacc)
 			return lexPath
 		case c == '.':
-			l.emit(itemDot)
+			l.emit(ItemDot)
 		case c == ',':
-			l.emit(itemComma)
+			l.emit(ItemComma)
 		case isVarchar(c):
 			// l.peek() return (0, false) at l.eof()
 			for c, _ := l.peek(); isVarchar(c); c, _ = l.peek() {
 				l.pos++
 			}
-			l.emit(itemVar)
+			l.emit(ItemVar)
 		case c == '*':
-			l.emit(itemExplode)
+			l.emit(ItemExplode)
 		case c == ':':
-			l.emit(itemPrefix)
+			l.emit(ItemPrefix)
 			return lexLength
 		default:
 			return l.error(errorUnexpected(c))
@@ -263,7 +273,7 @@ func lexLength(l *lexer) stateFn {
 			if l.pos == l.start {
 				return l.error(errorExpectedLength())
 			}
-			l.emit(itemLength)
+			l.emit(ItemLength)
 			return lexInExpr
 		}
 		l.pos++

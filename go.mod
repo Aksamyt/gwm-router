@@ -1,3 +1,3 @@
-module gwm-router
+module uritemplate
 
 go 1.15

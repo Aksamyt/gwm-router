@@ -13,12 +13,12 @@ import (
 type lexTest struct {
 	name  string
 	input string
-	items []item
+	items []Item
 }
 
-func collect(l *lexer) (items []item) {
+func collect(stream chan Item) (items []Item) {
 	for {
-		item, ok := <-l.items
+		item, ok := <-stream
 		if !ok {
 			break
 		}
@@ -27,61 +27,61 @@ func collect(l *lexer) (items []item) {
 	return
 }
 
-func equal(i1, i2 []item) bool {
+func equal(i1, i2 []Item) bool {
 	if len(i1) != len(i2) {
 		return false
 	}
 	for k := range i1 {
-		if i1[k].typ != i2[k].typ {
+		if i1[k].Typ != i2[k].Typ {
 			return false
 		}
-		if i1[k].val != i2[k].val {
+		if i1[k].Val != i2[k].Val {
 			return false
 		}
 	}
 	return true
 }
 
-func sayError(t *testing.T, tt lexTest, items []item) {
+func sayError(t *testing.T, tt lexTest, items []Item) {
 	t.Errorf("%s: got\n\t%+v\nexpected\n\t%v\ninput\n\t%q", tt.name, items, tt.items, tt.input)
 }
 
 var (
-	tError   = func(msg string) item { return item{itemError, msg} }
-	tSep     = item{itemSep, "/"}
-	tLacc    = item{itemLacc, "{"}
-	tRacc    = item{itemRacc, "}"}
-	tOp      = func(op string) item { return item{itemOp, op} }
-	tExplode = item{itemExplode, "*"}
-	tPrefix  = item{itemPrefix, ":"}
-	tLength  = func(n string) item { return item{itemLength, n} }
-	tDot     = item{itemDot, "."}
-	tComma   = item{itemComma, ","}
-	tEOF     = item{itemEOF, ""}
-	tRaw     = func(v string) item { return item{itemRaw, v} }
-	tVar     = func(v string) item { return item{itemVar, v} }
+	tError   = func(msg string) Item { return Item{ItemError, msg} }
+	tSep     = Item{ItemSep, "/"}
+	tLacc    = Item{ItemLacc, "{"}
+	tRacc    = Item{ItemRacc, "}"}
+	tOp      = func(op string) Item { return Item{ItemOp, op} }
+	tExplode = Item{ItemExplode, "*"}
+	tPrefix  = Item{ItemPrefix, ":"}
+	tLength  = func(n string) Item { return Item{ItemLength, n} }
+	tDot     = Item{ItemDot, "."}
+	tComma   = Item{ItemComma, ","}
+	tEOF     = Item{ItemEOF, ""}
+	tRaw     = func(v string) Item { return Item{ItemRaw, v} }
+	tVar     = func(v string) Item { return Item{ItemVar, v} }
 )
 
 func TestStringer(t *testing.T) {
 	for _, tt := range []lexTest{
-		{"invalid", "[]", []item{{typ: -1, val: ""}}},
+		{"invalid", "[]", []Item{{Typ: -1, Val: ""}}},
 		{
 			"itemError",
 			fmt.Sprintf("[ERROR %s]", errorUnfinishedPercent()),
-			[]item{tError(errorUnfinishedPercent())},
+			[]Item{tError(errorUnfinishedPercent())},
 		},
-		{"itemSep", "[/]", []item{tSep}},
-		{"itemLacc", "[{]", []item{tLacc}},
-		{"itemRacc", "[}]", []item{tRacc}},
-		{"itemOp", "[+]", []item{tOp("+")}},
-		{"itemExplode", "[*]", []item{tExplode}},
-		{"itemPrefix", "[:]", []item{tPrefix}},
-		{"itemLength", "[1234]", []item{tLength("1234")}},
-		{"itemDot", "[.]", []item{tDot}},
-		{"itemComma", "[,]", []item{tComma}},
-		{`itemRaw("hello")`, `["hello"]`, []item{tRaw("hello")}},
-		{`itemVar("hello")`, `['hello']`, []item{tVar("hello")}},
-		{"itemEOF", "[EOF]", []item{tEOF}},
+		{"itemSep", "[/]", []Item{tSep}},
+		{"itemLacc", "[{]", []Item{tLacc}},
+		{"itemRacc", "[}]", []Item{tRacc}},
+		{"itemOp", "[+]", []Item{tOp("+")}},
+		{"itemExplode", "[*]", []Item{tExplode}},
+		{"itemPrefix", "[:]", []Item{tPrefix}},
+		{"itemLength", "[1234]", []Item{tLength("1234")}},
+		{"itemDot", "[.]", []Item{tDot}},
+		{"itemComma", "[,]", []Item{tComma}},
+		{`itemRaw("hello")`, `["hello"]`, []Item{tRaw("hello")}},
+		{`itemVar("hello")`, `['hello']`, []Item{tVar("hello")}},
+		{"itemEOF", "[EOF]", []Item{tEOF}},
 	} {
 		out := fmt.Sprintf("%+v", tt.items)
 		if out != tt.input {
@@ -92,12 +92,12 @@ func TestStringer(t *testing.T) {
 
 func TestSimple(t *testing.T) {
 	for _, tt := range []lexTest{
-		{"empty", "", []item{tEOF}},
-		{"letters", "hello", []item{tRaw("hello"), tEOF}},
-		{"number", "123", []item{tRaw("123"), tEOF}},
-		{"punctuation", "(yes)", []item{tRaw("(yes)"), tEOF}},
+		{"empty", "", []Item{tEOF}},
+		{"letters", "hello", []Item{tRaw("hello"), tEOF}},
+		{"number", "123", []Item{tRaw("123"), tEOF}},
+		{"punctuation", "(yes)", []Item{tRaw("(yes)"), tEOF}},
 	} {
-		items := collect(lex(tt.input))
+		items := collect(Lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)
 		}
@@ -110,14 +110,14 @@ func TestEveryRawCharacter(t *testing.T) {
 		everyIllegal = "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f '<>^|}`" + `\"`
 	)
 	tests := []lexTest{
-		{"every legal raw characters", everyLegal, []item{
+		{"every legal raw characters", everyLegal, []Item{
 			tRaw(everyLegal),
 			tEOF,
 		}},
 	}
 	for i := range everyIllegal {
 		c := everyIllegal[i]
-		expected := []item{tError(errorIllegal(c))}
+		expected := []Item{tError(errorIllegal(c))}
 		tests = append(tests,
 			lexTest{
 				fmt.Sprint("illegal", c),
@@ -133,7 +133,7 @@ func TestEveryRawCharacter(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		items := collect(lex(tt.input))
+		items := collect(Lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)
 		}
@@ -144,8 +144,8 @@ func TestEveryRawCharacter(t *testing.T) {
 func TestRandomPercent(t *testing.T) {
 	err := quick.Check(func(c byte) bool {
 		input := fmt.Sprintf("%%%02x", c)
-		expected := []item{tRaw(string([]byte{c})), tEOF}
-		items := collect(lex(input))
+		expected := []Item{tRaw(string([]byte{c})), tEOF}
+		items := collect(Lex(input))
 		return equal(items, expected)
 	}, nil)
 	if e := (&quick.CheckError{}); errors.As(err, &e) {
@@ -155,23 +155,23 @@ func TestRandomPercent(t *testing.T) {
 
 func TestFailingPercent(t *testing.T) {
 	for _, tt := range []lexTest{
-		{"lonely %", "100%", []item{
+		{"lonely %", "100%", []Item{
 			tRaw("100"),
 			tError(errorUnfinishedPercent()),
 		}},
-		{"unfinished %", "2%2", []item{
+		{"unfinished %", "2%2", []Item{
 			tRaw("2"),
 			tError(errorUnfinishedPercent()),
 		}},
-		{"illegal character", "ohno%g2", []item{
+		{"illegal character", "ohno%g2", []Item{
 			tRaw("ohno"),
 			tError(errorIllegalPercent('g')),
 		}},
-		{"illegal character", "%2h", []item{
+		{"illegal character", "%2h", []Item{
 			tError(errorIllegalPercent('h')),
 		}},
 	} {
-		items := collect(lex(tt.input))
+		items := collect(Lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)
 		}
@@ -180,12 +180,12 @@ func TestFailingPercent(t *testing.T) {
 
 func TestRandomSlashes(t *testing.T) {
 	values := func(v []reflect.Value, r *rand.Rand) {
-		var a []item
+		var a []Item
 		var b strings.Builder
 		for r.Intn(20) > 0 {
 			if r.Intn(3) > 0 {
-				if len(a) > 0 && a[len(a)-1].typ == itemRaw {
-					a[len(a)-1].val += "o"
+				if len(a) > 0 && a[len(a)-1].Typ == ItemRaw {
+					a[len(a)-1].Val += "o"
 				} else {
 					a = append(a, tRaw("o"))
 				}
@@ -202,27 +202,27 @@ func TestRandomSlashes(t *testing.T) {
 		v[0] = reflect.ValueOf(append(a, tEOF))
 		v[1] = reflect.ValueOf(b.String())
 	}
-	err := quick.Check(func(expected []item, input string) bool {
-		items := collect(lex(input))
+	err := quick.Check(func(expected []Item, input string) bool {
+		items := collect(Lex(input))
 		return equal(items, expected)
 	}, &quick.Config{Values: values})
 	if e := (&quick.CheckError{}); errors.As(err, &e) {
-		expected := e.In[0].([]item)
+		expected := e.In[0].([]Item)
 		input := e.In[1].(string)
-		items := collect(lex(input))
+		items := collect(Lex(input))
 		sayError(t, lexTest{"random slash", input, expected}, items)
 	}
 }
 
 func TestVariableList(t *testing.T) {
 	for _, tt := range []lexTest{
-		{"single var", "{oui}", []item{
+		{"single var", "{oui}", []Item{
 			tLacc,
 			tVar("oui"),
 			tRacc,
 			tEOF,
 		}},
-		{"var with dots", "{foo.bar}", []item{
+		{"var with dots", "{foo.bar}", []Item{
 			tLacc,
 			tVar("foo"),
 			tDot,
@@ -230,7 +230,7 @@ func TestVariableList(t *testing.T) {
 			tRacc,
 			tEOF,
 		}},
-		{"vars with commas", "{foo,bar}", []item{
+		{"vars with commas", "{foo,bar}", []Item{
 			tLacc,
 			tVar("foo"),
 			tComma,
@@ -238,7 +238,7 @@ func TestVariableList(t *testing.T) {
 			tRacc,
 			tEOF,
 		}},
-		{"lots of things", "{a,,b.c_d,.12,}", []item{
+		{"lots of things", "{a,,b.c_d,.12,}", []Item{
 			tLacc,
 			tVar("a"),
 			tComma,
@@ -254,7 +254,7 @@ func TestVariableList(t *testing.T) {
 			tEOF,
 		}},
 	} {
-		items := collect(lex(tt.input))
+		items := collect(Lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)
 		}
@@ -267,7 +267,7 @@ func TestPrefixOperators(t *testing.T) {
 		tests = append(tests, lexTest{
 			fmt.Sprintf("op %c", c),
 			fmt.Sprintf("{%c}", c),
-			[]item{
+			[]Item{
 				tLacc,
 				tOp(string(c)),
 				tRacc,
@@ -277,7 +277,7 @@ func TestPrefixOperators(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		items := collect(lex(tt.input))
+		items := collect(Lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)
 		}
@@ -286,18 +286,18 @@ func TestPrefixOperators(t *testing.T) {
 
 func TestSuffixOperators(t *testing.T) {
 	for _, tt := range []lexTest{
-		{"explode", "{boom*}", []item{
+		{"explode", "{boom*}", []Item{
 			tLacc,
 			tVar("boom"),
 			tExplode,
 			tRacc,
 			tEOF,
 		}},
-		{"prefix 1", "{a:1}", []item{tLacc, tVar("a"), tPrefix, tLength("1"), tRacc, tEOF}},
-		{"prefix 2", "{a:27}", []item{tLacc, tVar("a"), tPrefix, tLength("27"), tRacc, tEOF}},
-		{"prefix 3", "{a:031}", []item{tLacc, tVar("a"), tPrefix, tLength("031"), tRacc, tEOF}},
-		{"prefix 4", "{a:9070}", []item{tLacc, tVar("a"), tPrefix, tLength("9070"), tRacc, tEOF}},
-		{"two of them", "{/list*,path:4}", []item{
+		{"prefix 1", "{a:1}", []Item{tLacc, tVar("a"), tPrefix, tLength("1"), tRacc, tEOF}},
+		{"prefix 2", "{a:27}", []Item{tLacc, tVar("a"), tPrefix, tLength("27"), tRacc, tEOF}},
+		{"prefix 3", "{a:031}", []Item{tLacc, tVar("a"), tPrefix, tLength("031"), tRacc, tEOF}},
+		{"prefix 4", "{a:9070}", []Item{tLacc, tVar("a"), tPrefix, tLength("9070"), tRacc, tEOF}},
+		{"two of them", "{/list*,path:4}", []Item{
 			tLacc,
 			tOp("/"),
 			tVar("list"),
@@ -310,7 +310,7 @@ func TestSuffixOperators(t *testing.T) {
 			tEOF,
 		}},
 	} {
-		items := collect(lex(tt.input))
+		items := collect(Lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)
 		}
@@ -319,35 +319,35 @@ func TestSuffixOperators(t *testing.T) {
 
 func TestWrongExpr(t *testing.T) {
 	tests := []lexTest{
-		{"nothing", "{}", []item{tLacc, tError(errorEmptyExpr())}},
-		{"unfinished", "{", []item{
+		{"nothing", "{}", []Item{tLacc, tError(errorEmptyExpr())}},
+		{"unfinished", "{", []Item{
 			tLacc,
 			tError(errorUnfinishedExpr()),
 		}},
-		{"unfinished var", "{hello", []item{
+		{"unfinished var", "{hello", []Item{
 			tLacc,
 			tVar("hello"),
 			tError(errorUnfinishedExpr()),
 		}},
-		{"unfinished explode", "{hello*", []item{
+		{"unfinished explode", "{hello*", []Item{
 			tLacc,
 			tVar("hello"),
 			tExplode,
 			tError(errorUnfinishedExpr()),
 		}},
-		{"space", "{ ", []item{tLacc, tError(errorUnexpected(' '))}},
-		{"space var", "{oi ", []item{
+		{"space", "{ ", []Item{tLacc, tError(errorUnexpected(' '))}},
+		{"space var", "{oi ", []Item{
 			tLacc,
 			tVar("oi"),
 			tError(errorUnexpected(' ')),
 		}},
-		{"space explode", "{oi* ", []item{
+		{"space explode", "{oi* ", []Item{
 			tLacc,
 			tVar("oi"),
 			tExplode,
 			tError(errorUnexpected(' ')),
 		}},
-		{"no length", "{a:}", []item{
+		{"no length", "{a:}", []Item{
 			tLacc,
 			tVar("a"),
 			tPrefix,
@@ -358,7 +358,7 @@ func TestWrongExpr(t *testing.T) {
 		tests = append(tests, lexTest{
 			fmt.Sprintf("reserved op %c", c),
 			fmt.Sprintf("{%c}", c),
-			[]item{
+			[]Item{
 				tLacc,
 				tError(errorReservedOp(byte(c))),
 			},
@@ -366,7 +366,7 @@ func TestWrongExpr(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		items := collect(lex(tt.input))
+		items := collect(Lex(tt.input))
 		if !equal(items, tt.items) {
 			sayError(t, tt, items)
 		}
