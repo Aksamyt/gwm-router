@@ -47,19 +47,19 @@ func sayError(t *testing.T, tt lexTest, items []Item) {
 }
 
 var (
-	tError   = func(msg string) Item { return Item{ItemError, msg} }
-	tSep     = Item{ItemSep, "/"}
-	tLacc    = Item{ItemLacc, "{"}
-	tRacc    = Item{ItemRacc, "}"}
-	tOp      = func(op string) Item { return Item{ItemOp, op} }
-	tExplode = Item{ItemExplode, "*"}
-	tPrefix  = Item{ItemPrefix, ":"}
-	tLength  = func(n string) Item { return Item{ItemLength, n} }
-	tDot     = Item{ItemDot, "."}
-	tComma   = Item{ItemComma, ","}
-	tEOF     = Item{ItemEOF, ""}
-	tRaw     = func(v string) Item { return Item{ItemRaw, v} }
-	tVar     = func(v string) Item { return Item{ItemVar, v} }
+	tError   = func(msg string) Item { return Item{ItemError, msg, 0} }
+	tSep     = Item{ItemSep, "/", 0}
+	tLacc    = Item{ItemLacc, "{", 0}
+	tRacc    = Item{ItemRacc, "}", 0}
+	tOp      = func(op string) Item { return Item{ItemOp, op, 0} }
+	tExplode = Item{ItemExplode, "*", 0}
+	tPrefix  = Item{ItemPrefix, ":", 0}
+	tLength  = func(n string) Item { return Item{ItemLength, n, 0} }
+	tDot     = Item{ItemDot, ".", 0}
+	tComma   = Item{ItemComma, ",", 0}
+	tEOF     = Item{ItemEOF, "", 0}
+	tRaw     = func(v string) Item { return Item{ItemRaw, v, 0} }
+	tVar     = func(v string) Item { return Item{ItemVar, v, 0} }
 )
 
 func TestStringer(t *testing.T) {

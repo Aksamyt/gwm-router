@@ -417,12 +417,12 @@ func TestAst(t *testing.T) {
 		}},
 	} {
 		t.Run(tt.in, func(t *testing.T) {
-			got, err := Parse(tt.in)
+			got, err := New().Parse(tt.in)
 			if err != nil {
-				t.Error(err)
+				t.Errorf("error:\n%v", err)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.expected) {
+			if !reflect.DeepEqual(got, &tt.expected) {
 				t.Errorf("got:\n%s\nexpected:\n%s\ninput:\n    %s", indent(got.String()), indent(tt.expected.String()), tt.in)
 			}
 		})

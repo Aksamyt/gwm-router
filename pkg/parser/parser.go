@@ -11,6 +11,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -119,95 +120,121 @@ const (
 	sMax
 )
 
-// Parse an URI template.
-func Parse(input string) (t Ast, err error) {
-	t.Vars = map[string]struct{}{}
-	var expr Expr
-	var v Var
-	var raw strings.Builder
-	state := sBeginRaw
+type Parser struct {
+	t Ast
+	e Expr
+	v Var
+	r strings.Builder
+	s int
+	i lexer.Item
+}
 
-loop:
-	for item := range lexer.Lex(input) {
-		switch int(item.Typ)*sMax + state {
+func New() *Parser {
+	return &Parser{
+		t: Ast{Vars: map[string]struct{}{}},
+		s: sBeginRaw,
+	}
+}
+
+// Parse an URI template.
+func (p *Parser) Parse(input string) (*Ast, error) {
+	for p.i = range lexer.Lex(input) {
+		if p.i.Typ == lexer.ItemError {
+			return nil, Error{
+				Err:   errors.New(p.i.Val),
+				Input: input,
+				Pos:   p.i.Pos,
+			}
+		}
+		switch int(p.i.Typ)*sMax + p.s {
 		case sRaw + sMax*int(lexer.ItemEOF):
 			fallthrough
 		case sBeginRaw + sMax*int(lexer.ItemEOF):
-			if raw.Len() > 0 {
-				t.Parts = append(t.Parts, raw.String())
+			if p.r.Len() > 0 {
+				p.t.Parts = append(p.t.Parts, p.r.String())
 			}
-			break loop
+			return &p.t, nil
 
 		case sRaw + sMax*int(lexer.ItemRaw):
 			fallthrough
 		case sBeginRaw + sMax*int(lexer.ItemRaw):
-			raw.WriteString(item.Val)
-			state = sRaw
+			p.r.WriteString(p.i.Val)
+			p.s = sRaw
 
 		case sRaw + sMax*int(lexer.ItemSep):
 			fallthrough
 		case sBeginRaw + sMax*int(lexer.ItemSep):
-			if raw.Len() > 0 {
-				t.Parts = append(t.Parts, raw.String())
-				raw.Reset()
+			if p.r.Len() > 0 {
+				p.t.Parts = append(p.t.Parts, p.r.String())
+				p.r.Reset()
 			}
-			if len(t.Parts) > 0 && t.Parts[len(t.Parts)-1] != nil {
-				t.Parts = append(t.Parts, nil)
+			if len(p.t.Parts) > 0 && p.t.Parts[len(p.t.Parts)-1] != nil {
+				p.t.Parts = append(p.t.Parts, nil)
 			}
 
 		case sRaw + sMax*int(lexer.ItemLacc):
-			if raw.Len() > 0 {
-				t.Parts = append(t.Parts, raw.String())
-				raw.Reset()
+			if p.r.Len() > 0 {
+				p.t.Parts = append(p.t.Parts, p.r.String())
+				p.r.Reset()
 			}
 			fallthrough
 		case sBeginRaw + sMax*int(lexer.ItemLacc):
-			expr = Expr{}
-			v = Var{}
-			state = sAfterLacc
+			p.e = Expr{}
+			p.v = Var{}
+			p.s = sAfterLacc
 
 		case sAfterLacc + sMax*int(lexer.ItemOp):
-			expr.Op = item.Val[0]
-			state = sExpectVar
+			p.e.Op = p.i.Val[0]
+			p.s = sExpectVar
 
 		case sExpectVar + sMax*int(lexer.ItemVar):
 			fallthrough
 		case sAfterLacc + sMax*int(lexer.ItemVar):
-			if len(v.ID) == 0 {
-				t.Vars[item.Val] = struct{}{}
+			if len(p.v.ID) == 0 {
+				p.t.Vars[p.i.Val] = struct{}{}
 			}
-			v.ID = append(v.ID, item.Val)
-			state = sAfterVar
+			p.v.ID = append(p.v.ID, p.i.Val)
+			p.s = sAfterVar
 
 		case sAfterVar + sMax*int(lexer.ItemDot):
-			state = sExpectVar
+			p.s = sExpectVar
 
 		case sAfterMod + sMax*int(lexer.ItemComma):
 			fallthrough
 		case sAfterVar + sMax*int(lexer.ItemComma):
-			expr.Vars = append(expr.Vars, v)
-			v = Var{}
-			state = sExpectVar
+			p.e.Vars = append(p.e.Vars, p.v)
+			p.v = Var{}
+			p.s = sExpectVar
 
 		case sAfterVar + sMax*int(lexer.ItemExplode):
-			v.Mod = ModExplode
-			state = sAfterMod
+			p.v.Mod = ModExplode
+			p.s = sAfterMod
 
 		case sAfterVar + sMax*int(lexer.ItemPrefix):
-			v.Mod = ModPrefix
-			state = sExpectLength
+			p.v.Mod = ModPrefix
+			p.s = sExpectLength
 
 		case sExpectLength + sMax*int(lexer.ItemLength):
-			v.Mod += Mod(mustAtoi(item.Val))
-			state = sAfterMod
+			p.v.Mod += Mod(mustAtoi(p.i.Val))
+			p.s = sAfterMod
 
 		case sAfterMod + sMax*int(lexer.ItemRacc):
 			fallthrough
 		case sAfterVar + sMax*int(lexer.ItemRacc):
-			expr.Vars = append(expr.Vars, v)
-			t.Parts = append(t.Parts, expr)
-			state = sBeginRaw
+			p.e.Vars = append(p.e.Vars, p.v)
+			p.t.Parts = append(p.t.Parts, p.e)
+			p.s = sBeginRaw
+
+		default:
+			return nil, Error{
+				Input: input,
+				Pos:   p.i.Pos,
+				Err: &UnimplementedError{
+					State: p.s,
+					Item:  p.i,
+				},
+			}
 		}
 	}
-	return
+	return nil, nil
 }

@@ -12,7 +12,7 @@ package lexer
 import "fmt"
 
 func (l *lexer) error(msg string) stateFn {
-	l.items <- Item{ItemError, msg}
+	l.items <- Item{ItemError, msg, l.pos}
 	return nil
 }
 

@@ -44,6 +44,7 @@ const (
 type Item struct {
 	Typ ItemType // type of the item
 	Val string   // scanned substring
+	Pos int      // position in the input
 }
 
 // String returns a human-readable representation of an item.
@@ -120,12 +121,12 @@ func (l *lexer) next() (byte, bool) {
 }
 
 func (l *lexer) emit(typ ItemType) {
-	l.items <- Item{typ, l.input[l.start:l.pos]}
+	l.items <- Item{typ, l.input[l.start:l.pos], l.start}
 	l.start = l.pos
 }
 
 func (l *lexer) emitRaw(s string) {
-	l.items <- Item{ItemRaw, s}
+	l.items <- Item{ItemRaw, s, l.pos}
 	l.start = l.pos
 }
 
