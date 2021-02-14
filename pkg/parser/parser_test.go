@@ -18,16 +18,20 @@ func mv(s ...string) map[string]struct{} {
 	return m
 }
 
+func mid(s ...string) []string {
+	return s
+}
+
 func TestExprStringer(t *testing.T) {
 	for _, tt := range []struct {
 		in       Expr
 		expected string
 	}{
-		{Expr{Vars: []Var{{ID: "var"}}}, "{var}"},
+		{Expr{Vars: []Var{{ID: mid("var")}}}, "{var}"},
 		{Expr{Op: '+', Vars: []Var{
-			{ID: "var"},
-			{ID: "prefix", Mod: ModPrefix + 12},
-			{ID: "explode", Mod: ModExplode},
+			{ID: mid("var")},
+			{ID: mid("prefix"), Mod: ModPrefix + 12},
+			{ID: mid("explode"), Mod: ModExplode},
 		}}, "{+var,prefix:12,explode*}"},
 	} {
 		t.Run(tt.expected, func(t *testing.T) {
@@ -49,7 +53,7 @@ func TestAstStringer(t *testing.T) {
 			Parts: []interface{}{
 				"raw",
 				nil,
-				Expr{Vars: []Var{{ID: "var"}}},
+				Expr{Vars: []Var{{ID: mid("var")}}},
 			},
 		}, "VARS: [a b c]\n[\"raw\" / {var}]"},
 	} {
@@ -78,7 +82,7 @@ func TestAst(t *testing.T) {
 		{"{var}", Ast{
 			Vars: mv("var"),
 			Parts: []interface{}{
-				Expr{Vars: []Var{{ID: "var"}}},
+				Expr{Vars: []Var{{ID: mid("var")}}},
 			},
 		}},
 		{"a//{var}/a{var}a/a", Ast{
@@ -86,10 +90,10 @@ func TestAst(t *testing.T) {
 			Parts: []interface{}{
 				"a",
 				nil,
-				Expr{Vars: []Var{{ID: "var"}}},
+				Expr{Vars: []Var{{ID: mid("var")}}},
 				nil,
 				"a",
-				Expr{Vars: []Var{{ID: "var"}}},
+				Expr{Vars: []Var{{ID: mid("var")}}},
 				"a",
 				nil,
 				"a",
@@ -98,13 +102,13 @@ func TestAst(t *testing.T) {
 		{"{+var}", Ast{
 			Vars: mv("var"),
 			Parts: []interface{}{
-				Expr{Op: '+', Vars: []Var{{ID: "var"}}},
+				Expr{Op: '+', Vars: []Var{{ID: mid("var")}}},
 			},
 		}},
 		{"{+path}/here", Ast{
 			Vars: mv("path"),
 			Parts: []interface{}{
-				Expr{Op: '+', Vars: []Var{{ID: "path"}}},
+				Expr{Op: '+', Vars: []Var{{ID: mid("path")}}},
 				nil,
 				"here",
 			},
@@ -113,23 +117,26 @@ func TestAst(t *testing.T) {
 			Vars: mv("path"),
 			Parts: []interface{}{
 				"here?ref=",
-				Expr{Op: '+', Vars: []Var{{ID: "path"}}},
+				Expr{Op: '+', Vars: []Var{{ID: mid("path")}}},
 			},
 		}},
 		{"map?{x,y}", Ast{
 			Vars: mv("x", "y"),
 			Parts: []interface{}{
 				"map?",
-				Expr{Vars: []Var{{ID: "x"}, {ID: "y"}}},
+				Expr{Vars: []Var{
+					{ID: mid("x")},
+					{ID: mid("y")},
+				}},
 			},
 		}},
 		{"{x,hello,y}", Ast{
 			Vars: mv("x", "hello", "y"),
 			Parts: []interface{}{
 				Expr{Vars: []Var{
-					{ID: "x"},
-					{ID: "hello"},
-					{ID: "y"},
+					{ID: mid("x")},
+					{ID: mid("hello")},
+					{ID: mid("y")},
 				}},
 			},
 		}},
@@ -137,9 +144,9 @@ func TestAst(t *testing.T) {
 			Vars: mv("x", "hello", "y"),
 			Parts: []interface{}{
 				Expr{Op: '+', Vars: []Var{
-					{ID: "x"},
-					{ID: "hello"},
-					{ID: "y"},
+					{ID: mid("x")},
+					{ID: mid("hello")},
+					{ID: mid("y")},
 				}},
 			},
 		}},
@@ -147,8 +154,8 @@ func TestAst(t *testing.T) {
 			Vars: mv("path", "x"),
 			Parts: []interface{}{
 				Expr{Op: '+', Vars: []Var{
-					{ID: "path"},
-					{ID: "x"},
+					{ID: mid("path")},
+					{ID: mid("x")},
 				}},
 				nil,
 				"here",
@@ -158,9 +165,9 @@ func TestAst(t *testing.T) {
 			Vars: mv("x", "hello", "y"),
 			Parts: []interface{}{
 				Expr{Op: '#', Vars: []Var{
-					{ID: "x"},
-					{ID: "hello"},
-					{ID: "y"},
+					{ID: mid("x")},
+					{ID: mid("hello")},
+					{ID: mid("y")},
 				}},
 			},
 		}},
@@ -168,8 +175,8 @@ func TestAst(t *testing.T) {
 			Vars: mv("path", "x"),
 			Parts: []interface{}{
 				Expr{Op: '#', Vars: []Var{
-					{ID: "path"},
-					{ID: "x"},
+					{ID: mid("path")},
+					{ID: mid("x")},
 				}},
 				nil,
 				"here",
@@ -179,7 +186,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("var"),
 			Parts: []interface{}{
 				"X",
-				Expr{Op: '.', Vars: []Var{{ID: "var"}}},
+				Expr{Op: '.', Vars: []Var{{ID: mid("var")}}},
 			},
 		}},
 		{"X{.x,y}", Ast{
@@ -187,23 +194,23 @@ func TestAst(t *testing.T) {
 			Parts: []interface{}{
 				"X",
 				Expr{Op: '.', Vars: []Var{
-					{ID: "x"},
-					{ID: "y"},
+					{ID: mid("x")},
+					{ID: mid("y")},
 				}},
 			},
 		}},
 		{"{/var}", Ast{
 			Vars: mv("var"),
 			Parts: []interface{}{
-				Expr{Op: '/', Vars: []Var{{ID: "var"}}},
+				Expr{Op: '/', Vars: []Var{{ID: mid("var")}}},
 			},
 		}},
 		{"{/var,x}/here", Ast{
 			Vars: mv("var", "x"),
 			Parts: []interface{}{
 				Expr{Op: '/', Vars: []Var{
-					{ID: "var"},
-					{ID: "x"},
+					{ID: mid("var")},
+					{ID: mid("x")},
 				}},
 				nil,
 				"here",
@@ -213,8 +220,8 @@ func TestAst(t *testing.T) {
 			Vars: mv("x", "y"),
 			Parts: []interface{}{
 				Expr{Op: ';', Vars: []Var{
-					{ID: "x"},
-					{ID: "y"},
+					{ID: mid("x")},
+					{ID: mid("y")},
 				}},
 			},
 		}},
@@ -222,8 +229,8 @@ func TestAst(t *testing.T) {
 			Vars: mv("x", "y"),
 			Parts: []interface{}{
 				Expr{Op: '?', Vars: []Var{
-					{ID: "x"},
-					{ID: "y"},
+					{ID: mid("x")},
+					{ID: mid("y")},
 				}},
 			},
 		}},
@@ -231,14 +238,14 @@ func TestAst(t *testing.T) {
 			Vars: mv("x"),
 			Parts: []interface{}{
 				"?fixed=yes",
-				Expr{Op: '&', Vars: []Var{{ID: "x"}}},
+				Expr{Op: '&', Vars: []Var{{ID: mid("x")}}},
 			},
 		}},
 		{"{var:3}", Ast{
 			Vars: mv("var"),
 			Parts: []interface{}{
 				Expr{Vars: []Var{
-					{ID: "var", Mod: ModPrefix + 3},
+					{ID: mid("var"), Mod: ModPrefix + 3},
 				}},
 			},
 		}},
@@ -246,7 +253,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("var"),
 			Parts: []interface{}{
 				Expr{Vars: []Var{
-					{ID: "var", Mod: ModPrefix + 30},
+					{ID: mid("var"), Mod: ModPrefix + 30},
 				}},
 			},
 		}},
@@ -254,7 +261,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("list"),
 			Parts: []interface{}{
 				Expr{Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
 				}},
 			},
 		}},
@@ -262,7 +269,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("path"),
 			Parts: []interface{}{
 				Expr{Op: '+', Vars: []Var{
-					{ID: "path", Mod: ModPrefix + 6},
+					{ID: mid("path"), Mod: ModPrefix + 6},
 				}},
 				nil,
 				"here",
@@ -272,7 +279,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("list"),
 			Parts: []interface{}{
 				Expr{Op: '+', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
 				}},
 			},
 		}},
@@ -280,7 +287,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("path"),
 			Parts: []interface{}{
 				Expr{Op: '#', Vars: []Var{
-					{ID: "path", Mod: ModPrefix + 6},
+					{ID: mid("path"), Mod: ModPrefix + 6},
 				}},
 				nil,
 				"here",
@@ -290,7 +297,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("list"),
 			Parts: []interface{}{
 				Expr{Op: '#', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
 				}},
 			},
 		}},
@@ -299,7 +306,7 @@ func TestAst(t *testing.T) {
 			Parts: []interface{}{
 				"X",
 				Expr{Op: '.', Vars: []Var{
-					{ID: "var", Mod: ModPrefix + 3},
+					{ID: mid("var"), Mod: ModPrefix + 3},
 				}},
 			},
 		}},
@@ -308,7 +315,7 @@ func TestAst(t *testing.T) {
 			Parts: []interface{}{
 				"X",
 				Expr{Op: '.', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
 				}},
 			},
 		}},
@@ -316,8 +323,8 @@ func TestAst(t *testing.T) {
 			Vars: mv("var"),
 			Parts: []interface{}{
 				Expr{Op: '/', Vars: []Var{
-					{ID: "var", Mod: ModPrefix + 1},
-					{ID: "var"},
+					{ID: mid("var"), Mod: ModPrefix + 1},
+					{ID: mid("var")},
 				}},
 			},
 		}},
@@ -325,7 +332,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("list"),
 			Parts: []interface{}{
 				Expr{Op: '/', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
 				}},
 			},
 		}},
@@ -333,8 +340,8 @@ func TestAst(t *testing.T) {
 			Vars: mv("list", "path"),
 			Parts: []interface{}{
 				Expr{Op: '/', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
-					{ID: "path", Mod: ModPrefix + 4},
+					{ID: mid("list"), Mod: ModExplode},
+					{ID: mid("path"), Mod: ModPrefix + 4},
 				}},
 			},
 		}},
@@ -342,7 +349,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("hello"),
 			Parts: []interface{}{
 				Expr{Op: ';', Vars: []Var{
-					{ID: "hello", Mod: ModPrefix + 5},
+					{ID: mid("hello"), Mod: ModPrefix + 5},
 				}},
 			},
 		}},
@@ -350,7 +357,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("list"),
 			Parts: []interface{}{
 				Expr{Op: ';', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
 				}},
 			},
 		}},
@@ -358,7 +365,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("var"),
 			Parts: []interface{}{
 				Expr{Op: '?', Vars: []Var{
-					{ID: "var", Mod: ModPrefix + 3},
+					{ID: mid("var"), Mod: ModPrefix + 3},
 				}},
 			},
 		}},
@@ -366,7 +373,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("list"),
 			Parts: []interface{}{
 				Expr{Op: '?', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
 				}},
 			},
 		}},
@@ -374,7 +381,7 @@ func TestAst(t *testing.T) {
 			Vars: mv("var"),
 			Parts: []interface{}{
 				Expr{Op: '&', Vars: []Var{
-					{ID: "var", Mod: ModPrefix + 3},
+					{ID: mid("var"), Mod: ModPrefix + 3},
 				}},
 			},
 		}},
@@ -382,7 +389,29 @@ func TestAst(t *testing.T) {
 			Vars: mv("list"),
 			Parts: []interface{}{
 				Expr{Op: '&', Vars: []Var{
-					{ID: "list", Mod: ModExplode},
+					{ID: mid("list"), Mod: ModExplode},
+				}},
+			},
+		}},
+
+		{"{foo.bar}", Ast{
+			Vars: mv("foo"),
+			Parts: []interface{}{
+				Expr{Vars: []Var{{ID: mid("foo", "bar")}}},
+			},
+		}},
+		{"{+foo.bar*,foo.jaj:9999}", Ast{
+			Vars: mv("foo"),
+			Parts: []interface{}{
+				Expr{Op: '+', Vars: []Var{
+					{
+						ID:  mid("foo", "bar"),
+						Mod: ModExplode,
+					},
+					{
+						ID:  mid("foo", "jaj"),
+						Mod: ModPrefix + 9999,
+					},
 				}},
 			},
 		}},

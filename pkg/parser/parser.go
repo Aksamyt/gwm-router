@@ -31,9 +31,9 @@ const (
 	ModExplode Mod = 1 << 15
 )
 
-// Var represents a variable with its modifier.
+// Var represents a (possibly qualified) variable with its modifier.
 type Var struct {
-	ID  string
+	ID  []string
 	Mod Mod
 }
 
@@ -54,7 +54,7 @@ func (e Expr) String() string {
 		if i > 0 {
 			s.WriteByte(',')
 		}
-		s.WriteString(v.ID)
+		s.WriteString(strings.Join(v.ID, "."))
 		if v.Mod&ModPrefix != 0 {
 			s.WriteByte(':')
 			s.WriteString(strconv.Itoa(int(v.Mod ^ ModPrefix)))
@@ -173,9 +173,14 @@ loop:
 		case sExpectVar + sMax*int(lexer.ItemVar):
 			fallthrough
 		case sAfterLacc + sMax*int(lexer.ItemVar):
-			t.Vars[item.Val] = struct{}{}
-			v.ID = item.Val
+			if len(v.ID) == 0 {
+				t.Vars[item.Val] = struct{}{}
+			}
+			v.ID = append(v.ID, item.Val)
 			state = sAfterVar
+
+		case sAfterVar + sMax*int(lexer.ItemDot):
+			state = sExpectVar
 
 		case sAfterMod + sMax*int(lexer.ItemComma):
 			fallthrough
