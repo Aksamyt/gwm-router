@@ -11,7 +11,6 @@
 package parser
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -101,140 +100,156 @@ func (t Ast) String() string {
 	return fmt.Sprintf("VARS: %v\n%v", vars, parts)
 }
 
-func mustAtoi(s string) int {
-	i, _ := strconv.Atoi(s)
-	return i
+type stateFn func(*parser) (stateFn, error)
+
+type parser struct {
+	ast      Ast
+	expr     Expr
+	variable Var
+	raw      strings.Builder
+	item     lexer.Item
 }
 
-// Parser states
-const (
-	sBeginRaw = iota
-	sRaw
-	sAfterLacc
-	sAfterVar
-	sExpectVar
-	sExpectLength
-	sAfterMod
-	sVar
-
-	sMax
-)
-
-type Parser struct {
-	t Ast
-	e Expr
-	v Var
-	r strings.Builder
-	s int
-	i lexer.Item
-}
-
-func New() *Parser {
-	return &Parser{
-		t: Ast{Vars: map[string]struct{}{}},
-		s: sBeginRaw,
+func (p *parser) pushRawIfAny() {
+	if p.raw.Len() > 0 {
+		p.ast.Parts = append(p.ast.Parts, p.raw.String())
+		p.raw.Reset()
 	}
 }
 
-// Parse an URI template.
-func (p *Parser) Parse(input string) (*Ast, error) {
-	for p.i = range lexer.Lex(input) {
-		if p.i.Typ == lexer.ItemError {
+func (p *parser) pushSeparator() {
+	if len(p.ast.Parts) == 0 || p.ast.Parts[len(p.ast.Parts)-1] != nil {
+		p.ast.Parts = append(p.ast.Parts, nil)
+	}
+}
+
+func (p *parser) appendVariablePart() {
+	part := p.item.Val
+	if len(p.variable.ID) == 0 {
+		p.ast.Vars[part] = struct{}{}
+	}
+	p.variable.ID = append(p.variable.ID, part)
+}
+
+func (p *parser) pushVariable() {
+	p.expr.Vars = append(p.expr.Vars, p.variable)
+	p.variable = Var{}
+}
+
+func (p *parser) pushExpr() {
+	p.ast.Parts = append(p.ast.Parts, p.expr)
+	p.expr = Expr{}
+}
+
+func (p *parser) assignOp() {
+	p.expr.Op = p.item.Val[0]
+}
+
+func (p *parser) setVariableLength() {
+	length, _ := strconv.Atoi(p.item.Val)
+	p.variable.Mod = ModPrefix + Mod(length)
+}
+
+func (p *parser) setVariableExplode() {
+	p.variable.Mod = ModExplode
+}
+
+func Parse(input string) (*Ast, error) {
+	p := parser{
+		ast: Ast{Vars: map[string]struct{}{}},
+	}
+	state, err := pRaw, error(nil)
+	for p.item = range lexer.Lex(input) {
+		if state, err = state(&p); err != nil {
 			return nil, Error{
-				Err:   errors.New(p.i.Val),
 				Input: input,
-				Pos:   p.i.Pos,
+				Pos:   p.item.Pos,
+				Err:   err,
 			}
 		}
-		switch int(p.i.Typ)*sMax + p.s {
-		case sRaw + sMax*int(lexer.ItemEOF):
-			fallthrough
-		case sBeginRaw + sMax*int(lexer.ItemEOF):
-			if p.r.Len() > 0 {
-				p.t.Parts = append(p.t.Parts, p.r.String())
-			}
-			return &p.t, nil
-
-		case sRaw + sMax*int(lexer.ItemRaw):
-			fallthrough
-		case sBeginRaw + sMax*int(lexer.ItemRaw):
-			p.r.WriteString(p.i.Val)
-			p.s = sRaw
-
-		case sRaw + sMax*int(lexer.ItemSep):
-			fallthrough
-		case sBeginRaw + sMax*int(lexer.ItemSep):
-			if p.r.Len() > 0 {
-				p.t.Parts = append(p.t.Parts, p.r.String())
-				p.r.Reset()
-			}
-			if len(p.t.Parts) > 0 && p.t.Parts[len(p.t.Parts)-1] != nil {
-				p.t.Parts = append(p.t.Parts, nil)
-			}
-
-		case sRaw + sMax*int(lexer.ItemLacc):
-			if p.r.Len() > 0 {
-				p.t.Parts = append(p.t.Parts, p.r.String())
-				p.r.Reset()
-			}
-			fallthrough
-		case sBeginRaw + sMax*int(lexer.ItemLacc):
-			p.e = Expr{}
-			p.v = Var{}
-			p.s = sAfterLacc
-
-		case sAfterLacc + sMax*int(lexer.ItemOp):
-			p.e.Op = p.i.Val[0]
-			p.s = sExpectVar
-
-		case sExpectVar + sMax*int(lexer.ItemVar):
-			fallthrough
-		case sAfterLacc + sMax*int(lexer.ItemVar):
-			if len(p.v.ID) == 0 {
-				p.t.Vars[p.i.Val] = struct{}{}
-			}
-			p.v.ID = append(p.v.ID, p.i.Val)
-			p.s = sAfterVar
-
-		case sAfterVar + sMax*int(lexer.ItemDot):
-			p.s = sExpectVar
-
-		case sAfterMod + sMax*int(lexer.ItemComma):
-			fallthrough
-		case sAfterVar + sMax*int(lexer.ItemComma):
-			p.e.Vars = append(p.e.Vars, p.v)
-			p.v = Var{}
-			p.s = sExpectVar
-
-		case sAfterVar + sMax*int(lexer.ItemExplode):
-			p.v.Mod = ModExplode
-			p.s = sAfterMod
-
-		case sAfterVar + sMax*int(lexer.ItemPrefix):
-			p.v.Mod = ModPrefix
-			p.s = sExpectLength
-
-		case sExpectLength + sMax*int(lexer.ItemLength):
-			p.v.Mod += Mod(mustAtoi(p.i.Val))
-			p.s = sAfterMod
-
-		case sAfterMod + sMax*int(lexer.ItemRacc):
-			fallthrough
-		case sAfterVar + sMax*int(lexer.ItemRacc):
-			p.e.Vars = append(p.e.Vars, p.v)
-			p.t.Parts = append(p.t.Parts, p.e)
-			p.s = sBeginRaw
-
-		default:
-			return nil, Error{
-				Input: input,
-				Pos:   p.i.Pos,
-				Err: &UnimplementedError{
-					State: p.s,
-					Item:  p.i,
-				},
-			}
+		if state == nil {
+			break
 		}
 	}
-	return nil, nil
+	return &p.ast, nil
+}
+
+func pRaw(p *parser) (state stateFn, err error) {
+	state = pRaw
+	switch p.item.Typ {
+	case lexer.ItemRaw:
+		p.raw.WriteString(p.item.Val)
+
+	case lexer.ItemSep:
+		p.pushRawIfAny()
+		p.pushSeparator()
+
+	case lexer.ItemLacc:
+		p.pushRawIfAny()
+		state = pMaybeOp
+
+	case lexer.ItemEOF:
+		p.pushRawIfAny()
+		state = nil
+
+	default:
+		err = UnimplementedError{p.item, "pRaw"}
+	}
+	return
+}
+
+func pMaybeOp(p *parser) (stateFn, error) {
+	if p.item.Typ == lexer.ItemOp {
+		p.assignOp()
+		return pExpr, nil
+	}
+	return pExpr(p)
+}
+
+func pExpr(p *parser) (state stateFn, err error) {
+	state = pExpr
+	switch p.item.Typ {
+	case lexer.ItemVar:
+		p.appendVariablePart()
+		state = pAfterVar
+
+	default:
+		err = UnimplementedError{p.item, "pExpr"}
+	}
+	return
+}
+
+func pAfterVar(p *parser) (state stateFn, err error) {
+	switch p.item.Typ {
+	case lexer.ItemRacc:
+		p.pushVariable()
+		p.pushExpr()
+		state = pRaw
+
+	case lexer.ItemDot:
+		state = pExpr
+
+	case lexer.ItemComma:
+		p.pushVariable()
+		state = pExpr
+
+	case lexer.ItemPrefix:
+		state = pLength
+
+	case lexer.ItemExplode:
+		p.setVariableExplode()
+		state = pAfterVar
+
+	default:
+		err = UnimplementedError{p.item, "pAfterVar"}
+	}
+	return
+}
+
+func pLength(p *parser) (stateFn, error) {
+	if p.item.Typ == lexer.ItemLength {
+		p.setVariableLength()
+		return pAfterVar, nil
+	}
+	return nil, UnimplementedError{p.item, "pLength"}
 }

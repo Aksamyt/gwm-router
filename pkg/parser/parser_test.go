@@ -417,7 +417,7 @@ func TestAst(t *testing.T) {
 		}},
 	} {
 		t.Run(tt.in, func(t *testing.T) {
-			got, err := New().Parse(tt.in)
+			got, err := Parse(tt.in)
 			if err != nil {
 				t.Errorf("error:\n%v", err)
 				return
