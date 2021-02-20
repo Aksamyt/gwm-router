@@ -184,7 +184,8 @@ func lexRaw(l *lexer) stateFn {
 	for l.pos < limit {
 		c, _ := l.next()
 		if c <= ' ' || strings.IndexByte(`"'<>\^|}`+"`", c) != -1 {
-			return l.error(errorIllegal(c))
+			l.pos-- // decrement to point at the character
+			return l.error(ErrorIllegal(c))
 		}
 	}
 	l.emit(ItemRaw)
@@ -197,13 +198,13 @@ func lexRaw(l *lexer) stateFn {
 func lexPercent(l *lexer) stateFn {
 	l.pos += 2
 	if l.pos > len(l.input) {
-		return l.error(errorUnfinishedPercent())
+		return l.error(ErrorUnfinishedPercent())
 	}
 	decoded, err := hex.DecodeString(l.input[l.pos-2 : l.pos])
 	if err != nil {
 		// We checked for hex.ErrLength earlier
 		e, _ := err.(hex.InvalidByteError)
-		return l.error(errorIllegalPercent(rune(e)))
+		return l.error(ErrorIllegalPercent(rune(e)))
 	}
 	l.emitRaw(string(decoded))
 	return lexPath
@@ -216,9 +217,9 @@ func lexBeginExpr(l *lexer) stateFn {
 	c, eof := l.peek()
 	switch {
 	case eof:
-		return l.error(errorUnfinishedExpr())
+		return l.error(ErrorUnfinishedExpr())
 	case c == '}':
-		return l.error(errorEmptyExpr())
+		return l.error(ErrorEmptyExpr())
 	case isVarchar(c):
 		return lexInExpr
 	case strings.IndexByte("+#./;?&", c) != -1:
@@ -226,9 +227,9 @@ func lexBeginExpr(l *lexer) stateFn {
 		l.emit(ItemOp)
 		return lexInExpr
 	case strings.IndexByte("=,!@|", c) != -1:
-		return l.error(errorReservedOp(c))
+		return l.error(ErrorReservedOp(c))
 	default:
-		return l.error(errorUnexpected(c))
+		return l.error(ErrorUnexpected(c))
 	}
 }
 
@@ -240,7 +241,7 @@ func lexInExpr(l *lexer) stateFn {
 		c, eof := l.next()
 		switch {
 		case eof:
-			return l.error(errorUnfinishedExpr())
+			return l.error(ErrorUnfinishedExpr())
 		case c == '}':
 			l.emit(ItemRacc)
 			return lexPath
@@ -260,7 +261,7 @@ func lexInExpr(l *lexer) stateFn {
 			l.emit(ItemPrefix)
 			return lexLength
 		default:
-			return l.error(errorUnexpected(c))
+			return l.error(ErrorUnexpected(c))
 		}
 	}
 }
@@ -272,7 +273,7 @@ func lexLength(l *lexer) stateFn {
 		c, _ := l.peek()
 		if c < '0' || c > '9' || l.pos > l.start+3 {
 			if l.pos == l.start {
-				return l.error(errorExpectedLength())
+				return l.error(ErrorExpectedLength())
 			}
 			l.emit(ItemLength)
 			return lexInExpr

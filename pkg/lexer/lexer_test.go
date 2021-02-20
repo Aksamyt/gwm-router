@@ -67,8 +67,8 @@ func TestStringer(t *testing.T) {
 		{"invalid", "[]", []Item{{Typ: -1, Val: ""}}},
 		{
 			"itemError",
-			fmt.Sprintf("[ERROR %s]", errorUnfinishedPercent()),
-			[]Item{tError(errorUnfinishedPercent())},
+			fmt.Sprintf("[ERROR %s]", ErrorUnfinishedPercent()),
+			[]Item{tError(ErrorUnfinishedPercent())},
 		},
 		{"itemSep", "[/]", []Item{tSep}},
 		{"itemLacc", "[{]", []Item{tLacc}},
@@ -117,7 +117,7 @@ func TestEveryRawCharacter(t *testing.T) {
 	}
 	for i := range everyIllegal {
 		c := everyIllegal[i]
-		expected := []Item{tError(errorIllegal(c))}
+		expected := []Item{tError(ErrorIllegal(c))}
 		tests = append(tests,
 			lexTest{
 				fmt.Sprint("illegal", c),
@@ -157,18 +157,18 @@ func TestFailingPercent(t *testing.T) {
 	for _, tt := range []lexTest{
 		{"lonely %", "100%", []Item{
 			tRaw("100"),
-			tError(errorUnfinishedPercent()),
+			tError(ErrorUnfinishedPercent()),
 		}},
 		{"unfinished %", "2%2", []Item{
 			tRaw("2"),
-			tError(errorUnfinishedPercent()),
+			tError(ErrorUnfinishedPercent()),
 		}},
 		{"illegal character", "ohno%g2", []Item{
 			tRaw("ohno"),
-			tError(errorIllegalPercent('g')),
+			tError(ErrorIllegalPercent('g')),
 		}},
 		{"illegal character", "%2h", []Item{
-			tError(errorIllegalPercent('h')),
+			tError(ErrorIllegalPercent('h')),
 		}},
 	} {
 		items := collect(Lex(tt.input))
@@ -319,39 +319,39 @@ func TestSuffixOperators(t *testing.T) {
 
 func TestWrongExpr(t *testing.T) {
 	tests := []lexTest{
-		{"nothing", "{}", []Item{tLacc, tError(errorEmptyExpr())}},
+		{"nothing", "{}", []Item{tLacc, tError(ErrorEmptyExpr())}},
 		{"unfinished", "{", []Item{
 			tLacc,
-			tError(errorUnfinishedExpr()),
+			tError(ErrorUnfinishedExpr()),
 		}},
 		{"unfinished var", "{hello", []Item{
 			tLacc,
 			tVar("hello"),
-			tError(errorUnfinishedExpr()),
+			tError(ErrorUnfinishedExpr()),
 		}},
 		{"unfinished explode", "{hello*", []Item{
 			tLacc,
 			tVar("hello"),
 			tExplode,
-			tError(errorUnfinishedExpr()),
+			tError(ErrorUnfinishedExpr()),
 		}},
-		{"space", "{ ", []Item{tLacc, tError(errorUnexpected(' '))}},
+		{"space", "{ ", []Item{tLacc, tError(ErrorUnexpected(' '))}},
 		{"space var", "{oi ", []Item{
 			tLacc,
 			tVar("oi"),
-			tError(errorUnexpected(' ')),
+			tError(ErrorUnexpected(' ')),
 		}},
 		{"space explode", "{oi* ", []Item{
 			tLacc,
 			tVar("oi"),
 			tExplode,
-			tError(errorUnexpected(' ')),
+			tError(ErrorUnexpected(' ')),
 		}},
 		{"no length", "{a:}", []Item{
 			tLacc,
 			tVar("a"),
 			tPrefix,
-			tError(errorExpectedLength()),
+			tError(ErrorExpectedLength()),
 		}},
 	}
 	for _, c := range "=,!@|" {
@@ -360,7 +360,7 @@ func TestWrongExpr(t *testing.T) {
 			fmt.Sprintf("{%c}", c),
 			[]Item{
 				tLacc,
-				tError(errorReservedOp(byte(c))),
+				tError(ErrorReservedOp(byte(c))),
 			},
 		})
 	}

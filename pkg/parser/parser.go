@@ -12,6 +12,7 @@ package parser
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -154,12 +155,41 @@ func (p *parser) setVariableExplode() {
 	p.variable.Mod = ModExplode
 }
 
+func (p *parser) noModifierOrError() error {
+	if p.variable.Mod != 0 {
+		return DoubleModError
+	}
+	return nil
+}
+
+func (p *parser) afterVarOrLengthError() error {
+	if p.variable.Mod&ModPrefix != 0 {
+		firstByte := p.item.Val[0]
+		if firstByte >= '0' && firstByte <= '9' {
+			p.item.Pos -= int(math.Log10(float64(
+				p.variable.Mod^ModPrefix,
+			))) + 1
+			return LengthOver9999Error
+		}
+	}
+	return AfterVarError
+}
+
+// Parse parses an URI template and returns an Ast or an error detailing what
+// happened.
 func Parse(input string) (*Ast, error) {
 	p := parser{
 		ast: Ast{Vars: map[string]struct{}{}},
 	}
 	state, err := pRaw, error(nil)
 	for p.item = range lexer.Lex(input) {
+		if p.item.Typ == lexer.ItemError {
+			return nil, Error{
+				Input: input,
+				Pos:   p.item.Pos,
+				Err:   LexerError{p.item},
+			}
+		}
 		if state, err = state(&p); err != nil {
 			return nil, Error{
 				Input: input,
@@ -213,6 +243,9 @@ func pExpr(p *parser) (state stateFn, err error) {
 		p.appendVariablePart()
 		state = pAfterVar
 
+	case lexer.ItemComma, lexer.ItemDot, lexer.ItemRacc:
+		err = ExpectedVarError
+
 	default:
 		err = UnimplementedError{p.item, "pExpr"}
 	}
@@ -234,11 +267,16 @@ func pAfterVar(p *parser) (state stateFn, err error) {
 		state = pExpr
 
 	case lexer.ItemPrefix:
+		err = p.noModifierOrError()
 		state = pLength
 
 	case lexer.ItemExplode:
+		err = p.noModifierOrError()
 		p.setVariableExplode()
 		state = pAfterVar
+
+	case lexer.ItemVar:
+		err = p.afterVarOrLengthError()
 
 	default:
 		err = UnimplementedError{p.item, "pAfterVar"}

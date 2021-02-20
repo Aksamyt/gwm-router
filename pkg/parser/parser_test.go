@@ -1,9 +1,12 @@
 package parser
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
+	"uritemplate/pkg/lexer"
 )
 
 func indent(s string) string {
@@ -424,6 +427,76 @@ func TestAst(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, &tt.expected) {
 				t.Errorf("got:\n%s\nexpected:\n%s\ninput:\n    %s", indent(got.String()), indent(tt.expected.String()), tt.in)
+			}
+		})
+	}
+}
+
+func makeLexerError(what string) LexerError {
+	return LexerError{lexer.Item{Typ: lexer.ItemError, Val: what}}
+}
+
+func TestErrors(t *testing.T) {
+	for _, expected := range []Error{
+		{
+			Input: `oh\no`,
+			Pos:   2,
+			Err:   makeLexerError(lexer.ErrorIllegal('\\')),
+		},
+		{
+			Input: "unfinished{",
+			Pos:   11,
+			Err:   makeLexerError(lexer.ErrorUnfinishedExpr()),
+		},
+		{
+			Input: "{!reservedOp}",
+			Pos:   1,
+			Err:   makeLexerError(lexer.ErrorReservedOp('!')),
+		},
+		{Input: "{doubleMod:3*}", Pos: 12, Err: DoubleModError},
+		{Input: "{doubleMod*:3}", Pos: 11, Err: DoubleModError},
+		{Input: "{commaComma,,}", Pos: 12, Err: ExpectedVarError},
+		{Input: "{dotDot..}", Pos: 8, Err: ExpectedVarError},
+		{Input: "{commaEnd,}", Pos: 10, Err: ExpectedVarError},
+		{Input: "{dotEnd.}", Pos: 8, Err: ExpectedVarError},
+		{Input: "{dotComma.,}", Pos: 10, Err: ExpectedVarError},
+		{Input: "{commaDot,.}", Pos: 10, Err: ExpectedVarError},
+		{Input: "{noComma*ohno}", Pos: 9, Err: AfterVarError},
+		{Input: "{noComma:3ohno}", Pos: 10, Err: AfterVarError},
+		{Input: "{big:10000}", Pos: 5, Err: LengthOver9999Error},
+	} {
+		_, got := Parse(expected.Input)
+		if got == nil {
+			t.Errorf("got no error, expected:\n\t%#v\ninput:\n\t%q", expected, expected.Input)
+		} else if got.Error() != expected.Error() {
+			t.Errorf("got:\n\t%#v\nexpected:\n\t%#v\ninput:\n\t%q", got, expected, expected.Input)
+		}
+	}
+}
+
+func TestEveryStateCheckUnimplemented(t *testing.T) {
+	// lexer.ItemError should always be unimplemented by every stateFn
+	p := parser{item: lexer.Item{Typ: lexer.ItemError}}
+	for _, tt := range []struct {
+		stateName string
+		state     stateFn
+		p         parser
+	}{
+		{"pRaw", pRaw, p},
+		// pMaybeOp is special
+		{"pExpr", pExpr, p},
+		{"pAfterVar", pAfterVar, p},
+		{"pLength", pLength, p},
+	} {
+		t.Run(tt.stateName, func(t *testing.T) {
+			_, err := tt.state(&tt.p)
+			if ue := (UnimplementedError{}); !errors.As(err, &ue) {
+				t.Errorf("expected an UnimplementedError, got:\n\t%#v", err)
+			}
+			expectedMsg := fmt.Sprintf("undefined state!\ncurrent state: %s\ncurrent item: %v", tt.stateName, tt.p.item)
+			gotMsg := err.Error()
+			if gotMsg != expectedMsg {
+				t.Errorf("wrong formatting, got:\n\t%s\nexpected:\n\t%s", gotMsg, expectedMsg)
 			}
 		})
 	}

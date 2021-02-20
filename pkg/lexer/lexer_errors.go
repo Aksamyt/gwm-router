@@ -16,34 +16,34 @@ func (l *lexer) error(msg string) stateFn {
 	return nil
 }
 
-func errorIllegal(c byte) string {
+func ErrorIllegal(c byte) string {
 	return fmt.Sprintf("found illegal character «%c»", c)
 }
 
-func errorUnfinishedPercent() string {
+func ErrorUnfinishedPercent() string {
 	return "expected two hex digits"
 }
 
-func errorIllegalPercent(r rune) string {
-	return fmt.Sprintf("%s, got %#U", errorUnfinishedPercent(), r)
+func ErrorIllegalPercent(r rune) string {
+	return fmt.Sprintf("%s, got %#U", ErrorUnfinishedPercent(), r)
 }
 
-func errorUnfinishedExpr() string {
+func ErrorUnfinishedExpr() string {
 	return "expected '}', got EOF"
 }
 
-func errorEmptyExpr() string {
+func ErrorEmptyExpr() string {
 	return "empty expression"
 }
 
-func errorUnexpected(c byte) string {
+func ErrorUnexpected(c byte) string {
 	return fmt.Sprintf("unexpected %#U", c)
 }
 
-func errorReservedOp(c byte) string {
+func ErrorReservedOp(c byte) string {
 	return fmt.Sprintf("unexpected reserved operator %#U", c)
 }
 
-func errorExpectedLength() string {
+func ErrorExpectedLength() string {
 	return "expected length"
 }
