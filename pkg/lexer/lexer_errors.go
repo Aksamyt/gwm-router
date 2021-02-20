@@ -1,5 +1,5 @@
 /*
-  This file is part of the gwm-router project.
+  This file is part of the uritemplate project.
   Copyright (C) 2021 Alexandre Szymocha (@Aksamyt).
 
   This Source Code Form is subject to the terms of the Mozilla Public
