@@ -19,20 +19,6 @@ import (
 	"uritemplate/pkg/parser"
 )
 
-func getByKey(data reflect.Value, key string) (value reflect.Value) {
-	switch data.Kind() {
-	case reflect.Map:
-		keyValue := reflect.ValueOf(key)
-		if keyValue.Type().AssignableTo(data.Type().Key()) {
-			value = data.MapIndex(keyValue)
-		}
-	}
-	if value.Kind() == reflect.Interface {
-		value = value.Elem()
-	}
-	return
-}
-
 type exprWriter struct {
 	buf    bytes.Buffer  // used to do a single write and to implement some operator’s quirks
 	data   reflect.Value // the original data passed to Execute
@@ -87,7 +73,7 @@ func (e *exprWriter) writeValueAsKey(value reflect.Value) {
 }
 
 func (e *exprWriter) writeVariableKey(v *parser.Var) {
-	e.buf.WriteString(v.ID[0])
+	e.buf.WriteString(v.ID[len(v.ID)-1])
 	e.buf.WriteByte('=')
 }
 
@@ -95,7 +81,7 @@ func (e *exprWriter) writeVariableKey(v *parser.Var) {
 // Exploded iterable values are treated as if they were a collection of values
 // registered under the same key, which is the variable’s name.
 func (e *exprWriter) writeKvVariable(v *parser.Var) {
-	value := getByKey(e.data, v.ID[0])
+	value := findVariableValue(e.data, v)
 
 	// value was probably a nil interface{}, treat it as undef
 	if !value.IsValid() {
@@ -149,7 +135,7 @@ func (e *exprWriter) writeKvVariable(v *parser.Var) {
 
 // writeListVariable writes a variable’s value in a list context.
 func (e *exprWriter) writeListVariable(v *parser.Var) {
-	value := getByKey(e.data, v.ID[0])
+	value := findVariableValue(e.data, v)
 
 	// value was probably a nil interface{}, treat it as undef
 	if !value.IsValid() {
@@ -241,10 +227,11 @@ func Execute(ast *parser.Ast, w io.Writer, data interface{}) error {
 	for _, part := range ast.Parts {
 		switch part := part.(type) {
 		case parser.Expr:
-			//TODO: error handling
-			exprWriter := exprWriter{data: value, expr: &part}
-			exprWriter.writeExpr()
-			w.Write(exprWriter.buf.Bytes())
+			ew := exprWriter{data: value, expr: &part}
+			ew.writeExpr()
+			if _, err := w.Write(ew.buf.Bytes()); err != nil {
+				return err
+			}
 		case string:
 			if _, err := w.Write([]byte(part)); err != nil {
 				return err

@@ -75,3 +75,22 @@ func runCases(
 	}
 	t.Errorf("got:\n\t%q\nexpected any of:\n\t%#v\ninput:\n\t%q", got, cases, input)
 }
+
+func TestInvalidWriter(t *testing.T) {
+	pin, pout := io.Pipe()
+	pin.Close()
+	defer pout.Close()
+	for _, template := range []string{
+		"/",
+		"test",
+		"{var}",
+	} {
+		t.Run(template, func(t *testing.T) {
+			ast, _ := parser.Parse(template)
+			err := Execute(ast, pout, nil)
+			if err == nil {
+				t.Error("expected an error")
+			}
+		})
+	}
+}
