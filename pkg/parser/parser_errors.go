@@ -11,7 +11,8 @@ package parser
 
 import (
 	"fmt"
-	"uritemplate/pkg/lexer"
+
+	"github.com/aksamyt/uritemplate/pkg/lexer"
 )
 
 // Error represents a parser. Its Error() method provides a visual explanation

@@ -16,7 +16,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"uritemplate/pkg/lexer"
+
+	"github.com/aksamyt/uritemplate/pkg/lexer"
 )
 
 // Mod is a tag representing the modifier to apply, if any.

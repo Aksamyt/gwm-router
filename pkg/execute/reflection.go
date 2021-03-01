@@ -11,7 +11,8 @@ package execute
 
 import (
 	"reflect"
-	"uritemplate/pkg/parser"
+
+	"github.com/aksamyt/uritemplate/pkg/parser"
 )
 
 func dereference(v *reflect.Value) {

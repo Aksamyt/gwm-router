@@ -15,8 +15,9 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"uritemplate/pkg/escape"
-	"uritemplate/pkg/parser"
+
+	"github.com/aksamyt/uritemplate/pkg/escape"
+	"github.com/aksamyt/uritemplate/pkg/parser"
 )
 
 type exprWriter struct {

@@ -3,7 +3,8 @@ package execute
 import (
 	"bytes"
 	"testing"
-	"uritemplate/pkg/parser"
+
+	"github.com/aksamyt/uritemplate/pkg/parser"
 )
 
 type ID struct{}

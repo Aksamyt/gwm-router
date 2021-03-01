@@ -6,7 +6,8 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"uritemplate/pkg/parser"
+
+	"github.com/aksamyt/uritemplate/pkg/parser"
 )
 
 type Example struct {

@@ -6,7 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-	"uritemplate/pkg/lexer"
+
+	"github.com/aksamyt/uritemplate/pkg/lexer"
 )
 
 func indent(s string) string {
